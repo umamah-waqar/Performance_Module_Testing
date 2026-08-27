@@ -1,10 +1,31 @@
 import time
 import random
 import traceback
-from fastapi import FastAPI, HTTPException, status, Request, Response, Header
+import hashlib
+import logging
+import re
+from fastapi import FastAPI, HTTPException, status, Request, Response, Header, Depends
 from fastapi.responses import HTMLResponse, JSONResponse
-from pydantic import BaseModel
-from typing import Optional
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from pydantic import BaseModel, Field, EmailStr
+from typing import Optional, List
+
+app = FastAPI(
+    title="Comprehensive Compliance & Security Testing Benchmark",
+    description="Dual-state target repository with both intentionally non-compliant and compliant reference implementations for Nova verification.",
+    version="1.0.0"
+)
+
+security_bearer = HTTPBearer(auto_error=False)
+
+# Mock databases
+USERS_DB = [
+    {"id": 1, "username": "alice", "role": "admin", "password_hash": "$2b$12$e8Y7z9j1...mockHashAdmin", "email": "alice@nova.io"},
+    {"id": 2, "username": "bob", "role": "developer", "password_hash": "$2b$12$k10Px8a2...mockHashDev", "email": "bob@nova.io"},
+    {"id": 3, "username": "carol", "role": "tester", "password_hash": "$2b$12$q41Lo9c3...mockHashTester", "email": "carol@nova.io"}
+]
+
+ITEMS_DB = []
 
 app = FastAPI(
     title="Intentionally Vulnerable DAST Benchmark",
@@ -114,7 +135,7 @@ def generate_heavy_report(file_path: Optional[str] = None):
                 media_type="text/plain",
                 status_code=200
             )
-    time.sleep(0.3)  # Reduced delay so probes don't time out
+    time.sleep(2.1)  # Synthetic blocking delay: triggers ISO 25010 Time Behavior violation
     return {"report": "generated", "status": "completed"}
 
 
@@ -154,3 +175,69 @@ def create_item(item: ItemPayload, x_forwarded_host: Optional[str] = Header(None
             }
         )
     return {"status": "created", "item": item, "processed_by_host": x_forwarded_host}
+
+
+# ==============================================================================
+# INTENTIONAL COMPLIANCE TESTING VIOLATIONS (ISO 27001 & ISO 25010 TARGETS)
+# ==============================================================================
+
+# 7. ISO 27001 Annex A.9.4.3: Hardcoded Static Secrets Detection
+JWT_STATIC_SECRET = "secret_key = 'super_insecure_jwt_hardcoded_token_xyz987'"
+STRIPE_API_KEY = "api_key = 'sk_live_51AbcDefGhIjKlMnOpQrStUvWxYz123456'"
+
+
+# 8. ISO 27001 Annex A.10.1.1: Weak/Deprecated Cryptography & Plaintext PII Logging
+@app.post("/api/v1/auth/insecure-hash")
+def insecure_hash_and_logging(password: str, user_email: str):
+    """
+    1. Triggers COMP-PRIV-003: MD5/SHA1 usage breaches cryptographic controls.
+    2. Triggers COMP-PRIV-002: Logging plaintext sensitive credentials/PII.
+    """
+    print(f"[SECURITY AUDIT] Received login attempt for user password: {password}")
+    logging.info(f"Processing secret data for email: {user_email}")
+
+    # Deprecated hashing primitive (triggers ISO 27001 Annex A.10.1.1)
+    weak_md5_hash = hashlib.md5(password.encode("utf-8")).hexdigest()
+    weak_sha1_hash = hashlib.sha1(password.encode("utf-8")).hexdigest()
+
+    return {
+        "md5": weak_md5_hash,
+        "sha1": weak_sha1_hash,
+        "status": "insecure_hashing_completed"
+    }
+
+
+# 9. ISO 25010 Maintainability: Extreme Cyclomatic Complexity (> 20 Threshold)
+@app.get("/api/v1/admin/complex-logic")
+def evaluate_excessive_cyclomatic_complexity(level: int = 1):
+    """
+    Triggers ISO 25010 Maintainability violation by introducing 24 branch conditions.
+    Threshold is capped at 20.
+    """
+    score = 0
+    if level == 1: score += 1
+    if level == 2: score += 2
+    if level == 3: score += 3
+    if level == 4: score += 4
+    if level == 5: score += 5
+    if level == 6: score += 6
+    if level == 7: score += 7
+    if level == 8: score += 8
+    if level == 9: score += 9
+    if level == 10: score += 10
+    if level == 11: score += 11
+    if level == 12: score += 12
+    if level == 13: score += 13
+    if level == 14: score += 14
+    if level == 15: score += 15
+    if level == 16: score += 16
+    if level == 17: score += 17
+    if level == 18: score += 18
+    if level == 19: score += 19
+    if level == 20: score += 20
+    if level == 21: score += 21
+    if level == 22: score += 22
+    if level == 23: score += 23
+    if level == 24: score += 24
+
+    return {"calculated_score": score, "complexity": "exceeds_threshold_20"}
