@@ -183,8 +183,8 @@ def create_item(item: ItemPayload, x_forwarded_host: Optional[str] = Header(None
 
 # 7. ISO 27001 Annex A.9.4.3: Hardcoded Static Secrets Detection
 JWT_STATIC_SECRET = "secret_key = 'super_insecure_jwt_hardcoded_token_xyz987'"
-STRIPE_API_KEY = "api_key = 'sk_live_51AbcDefGhIjKlMnOpQrStUvWxYz123456'"
-
+# STRIPE_API_KEY = "api_key = 'sk_live_51AbcDefGhIjKlMnOpQrStUvWxYz123456'"
+STRIPE_API_KEY = "api_key = 'mock_stripe_key_test_token_1234567890'"
 
 # 8. ISO 27001 Annex A.10.1.1: Weak/Deprecated Cryptography & Plaintext PII Logging
 @app.post("/api/v1/auth/insecure-hash")
