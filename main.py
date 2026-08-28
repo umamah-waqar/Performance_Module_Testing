@@ -2,9 +2,11 @@ import time
 import random
 import traceback
 import hashlib
+import hmac
+import os
 import logging
 import re
-from fastapi import FastAPI, HTTPException, status, Request, Response, Header, Depends
+from fastapi import FastAPI, HTTPException, status, Request, Response, Header, Depends, Query
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, Field, EmailStr
@@ -18,7 +20,10 @@ app = FastAPI(
 
 security_bearer = HTTPBearer(auto_error=False)
 
-# Mock databases
+# ==============================================================================
+# ORIGINAL MOCK DATA & SCHEMAS
+# ==============================================================================
+
 USERS_DB = [
     {"id": 1, "username": "alice", "role": "admin", "password_hash": "$2b$12$e8Y7z9j1...mockHashAdmin", "email": "alice@nova.io"},
     {"id": 2, "username": "bob", "role": "developer", "password_hash": "$2b$12$k10Px8a2...mockHashDev", "email": "bob@nova.io"},
@@ -27,21 +32,16 @@ USERS_DB = [
 
 ITEMS_DB = []
 
-app = FastAPI(
-    title="Intentionally Vulnerable DAST Benchmark",
-    description="Vulnerable target application for Nova DAST & Security Testing verification",
-    version="1.0.0"
-)
 
-# Mock in-memory database
-USERS_DB = [
-    {"id": 1, "username": "alice", "role": "admin", "password_hash": "$2b$12$e8Y7z9j1...mockHashAdmin"},
-    {"id": 2, "username": "bob", "role": "developer", "password_hash": "$2b$12$k10Px8a2...mockHashDev"},
-    {"id": 3, "username": "carol", "role": "tester", "password_hash": "$2b$12$q41Lo9c3...mockHashTester"}
-]
+class ItemPayload(BaseModel):
+    name: str
+    price: float
 
 
-# Global Middleware: Introduces Insecure Headers & Overly Permissive CORS (CWE-942 / CWE-693)
+# ==============================================================================
+# ORIGINAL MIDDLEWARE & INTENTIONAL MISCONFIGURATIONS
+# ==============================================================================
+
 @app.middleware("http")
 async def add_security_misconfigurations(request: Request, call_next):
     response: Response = await call_next(request)
@@ -57,10 +57,9 @@ async def add_security_misconfigurations(request: Request, call_next):
     return response
 
 
-class ItemPayload(BaseModel):
-    name: str
-    price: float
-
+# ==============================================================================
+# ORIGINAL VULNERABLE BENCHMARK ENDPOINTS
+# ==============================================================================
 
 # 1. Baseline Route with Information Leakage (CWE-200)
 @app.get("/health", status_code=status.HTTP_200_OK)
@@ -178,13 +177,13 @@ def create_item(item: ItemPayload, x_forwarded_host: Optional[str] = Header(None
 
 
 # ==============================================================================
-# INTENTIONAL COMPLIANCE TESTING VIOLATIONS (ISO 27001 & ISO 25010 TARGETS)
+# ORIGINAL INTENTIONAL COMPLIANCE TARGETS (ISO 27001 & ISO 25010)
 # ==============================================================================
 
 # 7. ISO 27001 Annex A.9.4.3: Hardcoded Static Secrets Detection
 JWT_STATIC_SECRET = "secret_key = 'super_insecure_jwt_hardcoded_token_xyz987'"
 STRIPE_API_KEY = "api_key = 'sk_live_51AbcDefGhIjKlMnOpQrStUvWxYz123456'"
-# STRIPE_API_KEY = "api_key = 'mock_stripe_key_test_token_1234567890'"
+
 
 # 8. ISO 27001 Annex A.10.1.1: Weak/Deprecated Cryptography & Plaintext PII Logging
 @app.post("/api/v1/auth/insecure-hash")
@@ -241,3 +240,115 @@ def evaluate_excessive_cyclomatic_complexity(level: int = 1):
     if level == 24: score += 24
 
     return {"calculated_score": score, "complexity": "exceeds_threshold_20"}
+
+
+# ==============================================================================
+# COMPLIANT REFERENCE IMPLEMENTATIONS (PASSING CONTROLS FOR BALANCED SCORE)
+# ==============================================================================
+
+class SecureUserResponse(BaseModel):
+    id: int
+    username: str
+    email: EmailStr
+    role: str
+
+
+class SecurePasswordRequest(BaseModel):
+    user_email: EmailStr
+    password: str = Field(..., min_length=8, description="Secure password minimum 8 chars")
+
+
+class SecureItemPayload(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    price: float = Field(..., gt=0.0)
+
+
+def require_authenticated_user(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_bearer)) -> dict:
+    """ISO 27001 Annex A.9.4.2: Enforces valid bearer token dependency."""
+    if not credentials or not credentials.credentials or credentials.credentials == "invalid":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required. Missing or invalid Bearer token.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return {"user_id": 1, "username": "alice", "role": "admin"}
+
+
+# Compliant 1: Secure, Zero-Leakage Health Check (ISO 25010 Time Behavior Passing)
+@app.get("/api/v2/health/secure", tags=["Compliant Reference"])
+def secure_health_check():
+    """ISO 25010 Compliant: Sub-millisecond response without config leakage."""
+    return {"status": "healthy", "service": "nova-core", "code": 200}
+
+
+# Compliant 2: Authenticated User Inventory (ISO 27001 Access Control Passing)
+@app.get("/api/v2/users/secure", response_model=List[SecureUserResponse], tags=["Compliant Reference"])
+def get_secure_users(
+    user_id: Optional[int] = Query(None, ge=1),
+    auth_user: dict = Depends(require_authenticated_user)
+):
+    """ISO 27001 Compliant: Sanitized user data protected by authorization."""
+    results = [
+        {"id": u["id"], "username": u["username"], "email": u.get("email", f"{u['username']}@nova.io"), "role": u["role"]}
+        for u in USERS_DB
+    ]
+    if user_id:
+        filtered = [u for u in results if u["id"] == user_id]
+        if not filtered:
+            raise HTTPException(status_code=404, detail="User not found")
+        return filtered
+    return results
+
+
+# Compliant 3: Secure Key Derivation (ISO 27001 Cryptography Control Passing)
+@app.post("/api/v2/auth/secure-hash", tags=["Compliant Reference"])
+def secure_cryptographic_hash(payload: SecurePasswordRequest):
+    """
+    ISO 27001 (Annex A.10.1.1 / CWE-327 Compliant):
+    Uses PBKDF2 HMAC-SHA256 with 100,000 iterations and a cryptographically secure random salt.
+    """
+    dynamic_salt = os.urandom(16)
+    derived_key = hashlib.pbkdf2_hmac(
+        "sha256",
+        payload.password.encode("utf-8"),
+        dynamic_salt,
+        100_000
+    )
+    return {
+        "status": "secure_hashing_completed",
+        "algorithm": "PBKDF2-HMAC-SHA256",
+        "iterations": 100_000,
+        "key_fingerprint": derived_key.hex()[:16]
+    }
+
+
+# Compliant 4: Low-Complexity Modular Logic (ISO 25010 Maintainability Passing)
+@app.get("/api/v2/admin/modular-logic", tags=["Compliant Reference"])
+def evaluate_modular_maintainable_logic(
+    level: int = Query(1, ge=1, le=50),
+    auth_user: dict = Depends(require_authenticated_user)
+):
+    """
+    ISO 25010 Maintainability Compliant:
+    Uses mathematical mapping instead of nested branch statements (Cyclomatic Complexity = 1).
+    """
+    calculated_score = (level * (level + 1)) // 2
+    return {
+        "calculated_score": calculated_score,
+        "cyclomatic_complexity": 1,
+        "status": "within_threshold"
+    }
+
+
+# Compliant 5: Safe Query Processing (ISO 25010 Time Behavior & OWASP A03 Passing)
+@app.get("/api/v2/catalog/optimized-search", tags=["Compliant Reference"])
+def secure_search_catalog(
+    query: str = Query("default", min_length=1, max_length=50),
+    auth_user: dict = Depends(require_authenticated_user)
+):
+    """ISO 25010 Compliant: Zero artificial delay, input bounded, authenticated."""
+    return {
+        "query": query,
+        "results_count": 2,
+        "results": [f"Item matching '{query}' - A", f"Item matching '{query}' - B"]
+    }
