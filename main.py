@@ -9,12 +9,13 @@ import re
 from fastapi import FastAPI, HTTPException, status, Request, Response, Header, Depends, Query
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field
 from typing import Optional, List
 
+# Single FastAPI instance with comprehensive benchmarking metadata
 app = FastAPI(
-    title="Comprehensive Compliance & Security Testing Benchmark",
-    description="Dual-state target repository with both intentionally non-compliant and compliant reference implementations for Nova verification.",
+    title="Comprehensive Compliance, Security & Performance Benchmark",
+    description="Dual-state benchmark with both intentionally vulnerable and compliant reference implementations for Nova verification.",
     version="1.0.0"
 )
 
@@ -58,7 +59,7 @@ async def add_security_misconfigurations(request: Request, call_next):
 
 
 # ==============================================================================
-# ORIGINAL VULNERABLE BENCHMARK ENDPOINTS
+# ORIGINAL VULNERABLE BENCHMARK ENDPOINTS (DAST / SAST / PERFORMANCE TRIGGERS)
 # ==============================================================================
 
 # 1. Baseline Route with Information Leakage (CWE-200)
@@ -249,12 +250,12 @@ def evaluate_excessive_cyclomatic_complexity(level: int = 1):
 class SecureUserResponse(BaseModel):
     id: int
     username: str
-    email: EmailStr
+    email: str = Field(..., pattern=r"^[\w\.-]+@[\w\.-]+\.\w+$")
     role: str
 
 
 class SecurePasswordRequest(BaseModel):
-    user_email: EmailStr
+    user_email: str = Field(..., pattern=r"^[\w\.-]+@[\w\.-]+\.\w+$")
     password: str = Field(..., min_length=8, description="Secure password minimum 8 chars")
 
 
